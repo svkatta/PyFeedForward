@@ -1,3 +1,5 @@
+########################################## should have written optimizer as seprate classs ##############################################
+
 # **Imports** #
 import numpy as np 
 import pandas as pd 
@@ -252,7 +254,6 @@ class FeedForwardNN:
         #train_X,Val_X            : no_of_samples x in_dim x 1
         
         #Initalization
-        
         beta_1 = adam_param[0];
         beta_2 = adam_param[1];
         epsilon = adam_param[2];
@@ -271,8 +272,7 @@ class FeedForwardNN:
 
             sample_id  = np.random.permutation(no_train_samples); #randomising batch
             
-            if(annealing == True):
-                Annealing_layers = self.layers;
+            
             
             for step in np.arange(int(no_train_samples/batch_size)): # each epoch
                 
@@ -327,13 +327,13 @@ class FeedForwardNN:
                         self.layers[layer].W = self.layers[layer].W - num_W/denom_W ;
                         self.layers[layer].B = self.layers[layer].B - num_B/denom_B ;
 
-                if((step%100==0)and(output_logs)):
+                if((step%100==0)and(IA.logs)):
                     log_Y_train = self.forward_propagation(train_X);
                     log_Y_val   = self.forward_propagation(val_X);
                     train_loss = self.loss_function(train_Y,log_Y_train);
-                    train_error = 100-Metrics.accuracy(self.argmax(log_Y_train,axis=1),np.argmax(train_Y,axis=1));
+                    train_error = 100-Metrics.accuracy(np.argmax(log_Y_train,axis=1),np.argmax(train_Y,axis=1));
                     val_loss = self.loss_function(val_Y,log_Y_val);
-                    val_error = 100-Metrics.accuracy(self.argmax(log_Y_val,axis=1),np.argmax(val_Y,axis=1));
+                    val_error = 100-Metrics.accuracy(np.argmax(log_Y_val,axis=1),np.argmax(val_Y,axis=1));
                     file_log_train.write("Epoch " +str(epoch)+", Step "+str(step)+" loss: "+ str(train_loss)+", Error: "+str(train_error)+", lr: "+str(eta)+"\n");
                     file_log_val.write("Epoch " +str(epoch)+", Step "+str(step)+" loss: "+ str(val_loss)+", Error: "+str(val_error)+", lr: "+str(eta)+"\n");
             
@@ -354,10 +354,13 @@ class FeedForwardNN:
             if(annealing == True):
                 if(self.annealing_accuracy<current_epoch_accuracy_val):
                     self.annealing_accuracy = current_epoch_accuracy_val;
+                    Annealing_layers = self.layers;
                 else:
-                    print("Annealing")
+                    print("Annealing Learning Rate")
                     eta = eta / 2 ;
                     self.layers = Annealing_layers;
+            #save model ;
+            save_model(self,epoch);
 
         file_log_train.close();
         file_log_val.close();        
@@ -374,19 +377,17 @@ class FeedForwardNN:
 def save_model(model,epoch):
         
         #writes model into file
-        filename= IA.save_dir + "FNN_model_e:" + str(epoch) + ".pickle";
-        filehandler = open(filename, 'wb') ;
-        pickle.dump(model, filehandler);
-        filehandler.close();
+        with open(IA.save_dir +'weights_{}.pkl'.format(epoch), 'wb') as f:
+            pickle.dump(model, f)
         
-def load_model(epoch):
+def load_model(state):
 
         #loades model from file
-        filename= IA.save_dir + "FNN_model_e:" + str(epoch) + ".pickle";
-        filehandler = open(filename, 'rb'); 
-        Model = pickle.load(filehandler);
-        filehandler.close();
+        with open(IA.save_dir +'weights_{}.pkl'.format(state),'rb') as f:
+              Model = pickle.load(f);
         return Model
+
+
 # **Metrics class**#
 
 class Metrics:
@@ -399,6 +400,13 @@ class Metrics:
     
 
 # **Argument Praser** #
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lr", help="initial learning rate for gradient descent based algorithms", type = float)
@@ -410,24 +418,21 @@ parser.add_argument("--loss", help="possible choices are squared error[sq] or cr
 parser.add_argument("--opt", help="the optimization algorithm to be used: gd, momentum, nag, adam", type = str)
 parser.add_argument("--batch_size", help="the batch size to be used - valid values are 1 and multiples of 5", type = int)
 parser.add_argument("--epochs", help="number of passes over the data", type = int)
-parser.add_argument("--anneal", help="if trur the algorithm should halve the learning rate if at any epoch the validation error increases and then restart that epoch", type = str)
+parser.add_argument("--anneal", help="if trur the algorithm should halve the learning rate if at any epoch the validation error increases and then restart that epoch", type = str2bool)
 parser.add_argument("--save_dir", help="the directory in which the pickled model should be saved", nargs='?', const=cwd,type = str)
 parser.add_argument("--expt_dir", help="the directory in which the log files will be saved",nargs='?', const=cwd, type = str)
 parser.add_argument("--train", help="path to the training dataset", type = str)
 parser.add_argument("--val", help="path to the validation dataset", type = str)
 parser.add_argument("--test", help="path to the test dataset", type = str)
-parser.add_argument("--pretrain", help="Flag to use pre train model",nargs='?', const='False', type = str)
+parser.add_argument("--pretrain", help="Flag to use pre train model",nargs='?', const=False, type = str2bool)
 parser.add_argument("--state", help="path to the validation dataset",nargs='?', const= 0 ,type = int)
-parser.add_argument("--testing", help="Flag to test model",nargs='?', const='True' ,type = str)
-parser.add_argument("--logs", help="Flag to either print logs or not ",nargs='?', const='False' ,type = str)
+parser.add_argument("--testing", help="Flag to test model",nargs='?', const=True ,type = str2bool)
+parser.add_argument("--logs", help="Flag to either write logs into a file or not ",nargs='?', const=False ,type = str2bool)
+parser.add_argument("--PCA", help="no of pca componets to be selected",nargs='?', const= 40 ,type = int)
 IA = parser.parse_args()
 
-print(IA);
-# **Hyper Parameters** #
 
-pca_com = 40 ;   # no of components to be selected  in PCA
-if(IA.logs=='True'):output_logs = True ;          # flag to write logs in a file
-else:output_logs = False;
+# **Hyper Parameters** #
 show_output = True ;           # flag to to show outputs in terminal
 weight_filler = 'rand';      # weight filler type
 
@@ -460,7 +465,7 @@ val_X = min_max_scalar.transform(val_X)
 test_X = min_max_scalar.transform(test_X)
 
 # Apply PCA for input data
-pre_pca = PCA(n_components=pca_com)
+pre_pca = PCA(n_components=IA.PCA)
 pre_pca.fit(train_X);
 train_X = pre_pca.transform(train_X); 
 val_X   = pre_pca.transform(val_X);
@@ -475,15 +480,25 @@ test_X = np.reshape(test_X,(-1,np.shape(test_X)[-1],1))
 
 train_Y = Function.one_hot_encoder(train_Y)
 val_Y = Function.one_hot_encoder(val_Y)
-print(np.shape(train_Y))
-print(np.shape(val_Y))
 
 #**Build Model**#
-if(IA.pretrain =='True'):
+if(IA.pretrain and IA.testing):
     Model = load_model(int(IA.state));
+    Model.print_model()
+elif(IA.pretrain and not IA.testing):
+    Model = load_model(int(IA.state));
+    Model.print_model()
+    Model.train_algo(train_X,train_Y,val_X,val_Y,
+                file_path = IA.expt_dir,
+                max_epochs=IA.epochs-IA.state,
+                annealing=IA.anneal,
+                opt=IA.opt,
+                batch_size=IA.batch_size,
+                momentum_param=IA.momentum,
+                eta=IA.lr)
 else:
     IA_sizes = IA.sizes.strip('[').strip(']').split(',');
-    l_sizes =[pca_com]+ [int(i) for i in IA_sizes] +[10];
+    l_sizes =[IA.PCA]+ [int(i) for i in IA_sizes] +[10];
 
     if(IA.activation == 'sigmoid') : l_acti  =["Input"] +[Function.sigmoid] * int(IA.num_hidden) ;
     elif(IA.activation == 'tanh')  : l_acti  =["Input"] +[Function.tanh]*int(IA.num_hidden) ;
@@ -496,28 +511,28 @@ else:
         loss_func = Function.sse;
 
     Model = FeedForwardNN(l_sizes,l_acti,loss_func);
+    Model.print_model();
+    Model.train_algo(train_X,train_Y,val_X,val_Y,
+                file_path = IA.expt_dir,
+                max_epochs=IA.epochs,
+                annealing=IA.anneal,
+                opt=IA.opt,
+                batch_size=IA.batch_size,
+                momentum_param=IA.momentum,
+                eta=IA.lr)
 
-# Train Model
-if(IA.anneal=='True'):flag_annealing = True;
-else :flag_annealing = False;
-print(flag_annealing);
-Model.print_model()
-Model.train_algo(train_X,train_Y,val_X,val_Y,
-                 file_path = IA.expt_dir,
-                 max_epochs=IA.epochs,
-                 annealing=flag_annealing,
-                 opt=IA.opt,
-                 batch_size=IA.batch_size,
-                 momentum_param=IA.momentum,
-                 eta=IA.lr)
+
+
+
 #save model
-save_model(Model,int(IA.state));
+#save_model(Model,int(IA.state));
 # Predicting Test
-if(IA.testing=='True'):
+
+if(IA.testing):
     test_pred = Model.predict(test_X)
     sub = pd.DataFrame()
     sub['id'] = test_data['id']
     sub['label'] = test_pred.reshape(-1)
-    sub.to_csv(IA.expt_dir+'test_submission.csv',index =False)
+    sub.to_csv(IA.expt_dir+'test_submission_'+str(IA.state)+'.csv',index =False)
 else:
-    pass;
+    pass
