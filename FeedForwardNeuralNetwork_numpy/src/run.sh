@@ -1,0 +1,2 @@
+#!/bin/bash
+python train.py --lr 0.01 --momentum 0.9 --num_hidden 2 --sizes 240,240 --activation sigmoid --loss ce --opt adam --batch_size 20 --epochs 20 --anneal True --save_dir ../save_dir/best/ --expt_dir ../expt_dir/ --train train.csv --val valid.csv --test test.csv --pretrain False --state 20 --testing False--logs False --PCA 40

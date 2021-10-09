@@ -1,0 +1,1 @@
+This is a programming assignment in which feedforward neural networks of varying architectures are implemented and are trained in NumPy without the use of frameworks such as TensorFlow. 
